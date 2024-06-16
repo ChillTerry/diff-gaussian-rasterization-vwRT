@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -75,6 +75,11 @@ namespace CudaRasterizer
 			char* geom_buffer,
 			char* binning_buffer,
 			char* image_buffer,
+			const float* angular_vel,
+			const float* linear_vel,
+			const float* vel_transofrm,
+			const float* vel_transofrm_inv,
+			const float delta_time,
 			const float* dL_dpix,
 			const float* dL_dpix_depth,
 			float* dL_dmean2D,
@@ -88,6 +93,7 @@ namespace CudaRasterizer
 			float* dL_dscale,
 			float* dL_drot,
 			float* dL_dtau,
+			float* dL_dvel,
 			bool debug);
 	};
 };

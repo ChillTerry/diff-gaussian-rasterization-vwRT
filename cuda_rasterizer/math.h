@@ -5,7 +5,7 @@ struct mat33 {
     float3 cols[3];
 
   __host__ __device__ mat33() {}
-  __host__ __device__ mat33(const float3 &c0, 
+  __host__ __device__ mat33(const float3 &c0,
                             const float3 &c1,
                             const float3 &c2) {
     cols[0] = c0;
@@ -38,11 +38,17 @@ struct mat33 {
                      make_float3(c0.y, c1.y, c2.y),
                      make_float3(c0.z, c1.z, c2.z));
     }
-    
-    __host__ __device__ float &operator[](int i) { 
+
+    __device__ void print() const {
+        printf("[%.6f, %.6f, %.6f]\n", cols[0].x, cols[1].x, cols[2].x);
+        printf("[%.6f, %.6f, %.6f]\n", cols[0].y, cols[1].y, cols[2].y);
+        printf("[%.6f, %.6f, %.6f]\n", cols[0].z, cols[1].z, cols[2].z);
+    }
+
+    __host__ __device__ float &operator[](int i) {
         float3 &col = cols[i / 3];
-        return (&col.x)[i % 3]; 
-    }    
+        return (&col.x)[i % 3];
+    }
 
     __host__ __device__ const mat33 operator+(const mat33 &m) const {
         float3 c0 = cols[0] + m.cols[0];
@@ -67,7 +73,7 @@ struct mat33 {
                                 c0.z * m1.x + c1.z * m1.y + c2.z * m1.z);
         float3 n2 = make_float3(c0.x * m2.x + c1.x * m2.y + c2.x * m2.z,
                                 c0.y * m2.x + c1.y * m2.y + c2.y * m2.z,
-                                c0.z * m2.x + c1.z * m2.y + c2.z * m2.z);   
+                                c0.z * m2.x + c1.z * m2.y + c2.z * m2.z);
         return mat33(n0, n1, n2);
     }
 
@@ -93,7 +99,7 @@ struct mat33 {
         float3 c2 = cols[2];
         return mat33(-c0, -c1, -c2);
     }
-    
+
     friend __host__ __device__  mat33 operator*(const float &s, const mat33 &m) {
         return m * s;
     }
@@ -104,7 +110,7 @@ struct mat33 {
 struct mat34 {
     float3 cols[4];
     __host__ __device__ mat34() {}
-    __host__ __device__ mat34(const float3 &c0, 
+    __host__ __device__ mat34(const float3 &c0,
           const float3 &c1,
           const float3 &c2,
           const float3 &c3) {
@@ -126,9 +132,9 @@ struct mat34 {
         cols[3] = v;
     }
 
-    __host__ __device__ float &operator[](int i) { 
+    __host__ __device__ float &operator[](int i) {
         float3 &col = cols[i / 3];
-        return (&col.x)[i % 3]; 
+        return (&col.x)[i % 3];
     }
 
     __host__ __device__ const mat34 operator+(const mat34 &m) const {
@@ -165,9 +171,16 @@ struct mat44 {
         cols[3] = make_float4(m.cols[3], 1);
     }
 
-    __host__ __device__ float &operator[](int i) { 
+    __host__ __device__ void print() const {
+        printf("[%.6f, %.6f, %.6f, %.6f]\n", cols[0].x, cols[1].x, cols[2].x, cols[3].x);
+        printf("[%.6f, %.6f, %.6f, %.6f]\n", cols[0].y, cols[1].y, cols[2].y, cols[3].y);
+        printf("[%.6f, %.6f, %.6f, %.6f]\n", cols[0].z, cols[1].z, cols[2].z, cols[3].z);
+        printf("[%.6f, %.6f, %.6f, %.6f]\n", cols[0].w, cols[1].w, cols[2].w, cols[3].w);
+    }
+
+    __host__ __device__ float &operator[](int i) {
         float4 &col = cols[i / 4];
-        return (&col.x)[i % 4]; 
+        return (&col.x)[i % 4];
     }
 
     __host__ __device__ mat44 operator+(const mat44 &m) const {
@@ -306,7 +319,7 @@ struct SE3 {
         return T;
     }
 
-    __host__ __device__ static SE3 Exp(const float3 &rho, const float3 &theta) {    
+    __host__ __device__ static SE3 Exp(const float3 &rho, const float3 &theta) {
         mat33 W = SO3::hat(theta);
         mat33 W2 = W * W;
         SO3 R = SO3::Exp(theta);
@@ -317,7 +330,7 @@ struct SE3 {
             V = I + 0.5f * W + 1.f / 6.f * W2;
         }
         else {
-            V = I + W * ((1 - cos(angle)) / (angle * angle)) 
+            V = I + W * ((1 - cos(angle)) / (angle * angle))
                 + W2 * ((angle - sin(angle)) / (angle * angle * angle));
         }
         float3 t = V * rho;

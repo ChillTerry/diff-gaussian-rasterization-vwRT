@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -65,7 +65,7 @@ __global__ void checkFrustum(int P,
 	present[idx] = in_frustum(idx, orig_points, viewmatrix, projmatrix, false, p_view);
 }
 
-// Generates one key/value pair for all Gaussian / tile overlaps. 
+// Generates one key/value pair for all Gaussian / tile overlaps.
 // Run once per Gaussian (1:N mapping).
 __global__ void duplicateWithKeys(
 	int P,
@@ -90,11 +90,11 @@ __global__ void duplicateWithKeys(
 
 		getRect(points_xy[idx], radii[idx], rect_min, rect_max, grid);
 
-		// For each tile that the bounding rect overlaps, emit a 
+		// For each tile that the bounding rect overlaps, emit a
 		// key/value pair. The key is |  tile ID  |      depth      |,
-		// and the value is the ID of the Gaussian. Sorting the values 
+		// and the value is the ID of the Gaussian. Sorting the values
 		// with this key yields Gaussian IDs in a list, such that they
-		// are first sorted by tile and then by depth. 
+		// are first sorted by tile and then by depth.
 		for (int y = rect_min.y; y < rect_max.y; y++)
 		{
 			for (int x = rect_min.x; x < rect_max.x; x++)
@@ -110,8 +110,8 @@ __global__ void duplicateWithKeys(
 	}
 }
 
-// Check keys to see if it is at the start/end of one tile's range in 
-// the full sorted list. If yes, write start/end of this tile. 
+// Check keys to see if it is at the start/end of one tile's range in
+// the full sorted list. If yes, write start/end of this tile.
 // Run once per instanced (duplicated) Gaussian ID.
 __global__ void identifyTileRanges(int L, uint64_t* point_list_keys, uint2* ranges)
 {
@@ -287,7 +287,7 @@ int CudaRasterizer::Rasterizer::forward(
 	char* binning_chunkptr = binningBuffer(binning_chunk_size);
 	BinningState binningState = BinningState::fromChunk(binning_chunkptr, num_rendered);
 
-	// For each instance to be rendered, produce adequate [ tile | depth ] key 
+	// For each instance to be rendered, produce adequate [ tile | depth ] key
 	// and corresponding dublicated Gaussian indices to be sorted
 	duplicateWithKeys << <(P + 255) / 256, 256 >> > (
 		P,
@@ -335,7 +335,7 @@ int CudaRasterizer::Rasterizer::forward(
 		background,
 		out_color,
 		geomState.depths,
-		out_depth, 
+		out_depth,
 		out_opacity,
 		n_touched
     ), debug)
@@ -365,6 +365,11 @@ void CudaRasterizer::Rasterizer::backward(
 	char* geom_buffer,
 	char* binning_buffer,
 	char* img_buffer,
+	const float* angular_vel,
+	const float* linear_vel,
+	const float* vel_transofrm,
+	const float* vel_transofrm_inv,
+	const float delta_time,
 	const float* dL_dpix,
 	const float* dL_dpix_depth,
 	float* dL_dmean2D,
@@ -378,6 +383,7 @@ void CudaRasterizer::Rasterizer::backward(
 	float* dL_dscale,
 	float* dL_drot,
 	float* dL_dtau,
+	float* dL_dvel,
 	bool debug)
 {
 	GeometryState geomState = GeometryState::fromChunk(geom_buffer, P);
@@ -441,6 +447,11 @@ void CudaRasterizer::Rasterizer::backward(
         projmatrix_raw,
 		focal_x, focal_y,
 		tan_fovx, tan_fovy,
+		angular_vel,
+		linear_vel,
+		vel_transofrm,
+		vel_transofrm_inv,
+		delta_time,
 		(glm::vec3*)campos,
 		(float3*)dL_dmean2D,
 		dL_dconic,
@@ -451,5 +462,6 @@ void CudaRasterizer::Rasterizer::backward(
 		dL_dsh,
 		(glm::vec3*)dL_dscale,
 		(glm::vec4*)dL_drot,
-		dL_dtau), debug)
+		dL_dtau,
+		dL_dvel), debug)
 }
