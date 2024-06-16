@@ -18,7 +18,7 @@ namespace cg = cooperative_groups;
 
 // Backward pass for conversion of spherical harmonics to RGB for
 // each Gaussian.
-__device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs,  float *dL_dtau)
+__device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs,  float *dL_dtau, float *dL_dvel)
 {
 	// Compute intermediate values, as it is done during forward
 	glm::vec3 pos = means[idx];
@@ -141,7 +141,9 @@ __device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::
 	dL_dtau[6 * idx + 0] += -dL_dmean.x;
 	dL_dtau[6 * idx + 1] += -dL_dmean.y;
 	dL_dtau[6 * idx + 2] += -dL_dmean.z;
-
+	dL_dvel[6 * idx + 0] += -dL_dmean.x;
+	dL_dvel[6 * idx + 1] += -dL_dmean.y;
+	dL_dvel[6 * idx + 2] += -dL_dmean.z;
 }
 
 // Backward version of INVERSE 2D covariance matrix computation
@@ -294,37 +296,46 @@ __global__ void computeCov2DCUDA(int P,
 	SE3 T_vel(vel_transofrm);
 	SE3 T_vel_inv(vel_transofrm_inv);
 
-	if (idx == 0) {
-		// printf("delta_time: %.6f\n", delta_time);
-		// printf("angular_vel:\n");
-		// printf("[%.6f, %.6f, %.6f]\n", angular_vel[0], angular_vel[1], angular_vel[2]);
-		// printf("linear_vel:\n");
-		// printf("[%.6f, %.6f, %.6f]\n", linear_vel[0], linear_vel[1], linear_vel[2]);
-		// printf("rot_vec:\n");
-		// printf("[%.6f, %.6f, %.6f]\n", rot_vec.x, rot_vec.y, rot_vec.z);
-		// printf("trans_vec:\n");
-		// printf("[%.6f, %.6f, %.6f]\n", trans_vec.x, trans_vec.y, trans_vec.z);
-		printf("T_vel:\n");
-		T_vel.data().print();
-	}
+	// if (idx == 0) {
+	// 	// printf("delta_time: %.6f\n", delta_time);
+	// 	// printf("angular_vel:\n");
+	// 	// printf("[%.6f, %.6f, %.6f]\n", angular_vel[0], angular_vel[1], angular_vel[2]);
+	// 	// printf("linear_vel:\n");
+	// 	// printf("[%.6f, %.6f, %.6f]\n", linear_vel[0], linear_vel[1], linear_vel[2]);
+	// 	// printf("rot_vec:\n");
+	// 	// printf("[%.6f, %.6f, %.6f]\n", rot_vec.x, rot_vec.y, rot_vec.z);
+	// 	// printf("trans_vec:\n");
+	// 	// printf("[%.6f, %.6f, %.6f]\n", trans_vec.x, trans_vec.y, trans_vec.z);
+	// 	printf("T_vel:\n");
+	// 	T_vel.data().print();
+	// }
 
 	SE3 T_CW(view_matrix);
 	SE3 T_CW_prime = T_vel_inv * T_CW;
 	mat44 T_CW_prime_mat44 = T_CW_prime.data();
 	float T_CW_prime_mat[4][4] = {{T_CW_prime_mat44[0], T_CW_prime_mat44[1], T_CW_prime_mat44[2], T_CW_prime_mat44[3]},
-								{T_CW_prime_mat44[4], T_CW_prime_mat44[5], T_CW_prime_mat44[6], T_CW_prime_mat44[7]},
-								{T_CW_prime_mat44[8], T_CW_prime_mat44[9], T_CW_prime_mat44[10], T_CW_prime_mat44[11]},
-								{T_CW_prime_mat44[12], T_CW_prime_mat44[13], T_CW_prime_mat44[14], T_CW_prime_mat44[15]}};
+								  {T_CW_prime_mat44[4], T_CW_prime_mat44[5], T_CW_prime_mat44[6], T_CW_prime_mat44[7]},
+								  {T_CW_prime_mat44[8], T_CW_prime_mat44[9], T_CW_prime_mat44[10], T_CW_prime_mat44[11]},
+								  {T_CW_prime_mat44[12], T_CW_prime_mat44[13], T_CW_prime_mat44[14], T_CW_prime_mat44[15]}};
 	const float* T_CW_prime_mat_ptr = &T_CW_prime_mat[0][0];
 	float3 t_prime = transformPoint4x3(mean, T_CW_prime_mat_ptr);
 
-	mat33 R = T_CW_prime.R().data();
-	mat33 RT = R.transpose();
-	float3 t_ = T_CW.t();
+	mat33 R_prime = T_CW_prime.R().data();
 	mat33 R_vel_mat33 = T_vel.R().data();
-	mat33 dpC_drho = R_vel_mat33 * mat33::identity();
-	mat33 dpC_dtheta = -R_vel_mat33 * mat33::skew_symmetric(t_prime);
+	mat33 dpC_drho_prime = R_vel_mat33 * mat33::identity();
+	mat33 dpC_dtheta_prime = -R_vel_mat33 * mat33::skew_symmetric(t_prime);
 
+	mat33 R = T_CW.R().data();
+	mat33 dpC_drho = mat33::identity();
+	mat33 dpC_dtheta = -mat33::skew_symmetric(t);
+
+	float dL_dt_prime[6];
+	for (int i = 0; i < 3; i++) {
+		float3 c_rho = dpC_drho_prime.cols[i];
+		float3 c_theta = dpC_dtheta_prime.cols[i];
+		dL_dt_prime[i] = dL_dtx * c_rho.x + dL_dty * c_rho.y + dL_dtz * c_rho.z;
+		dL_dt_prime[i + 3] = dL_dtx * c_theta.x + dL_dty * c_theta.y + dL_dtz * c_theta.z;
+	}
 	float dL_dt[6];
 	for (int i = 0; i < 3; i++) {
 		float3 c_rho = dpC_drho.cols[i];
@@ -333,7 +344,8 @@ __global__ void computeCov2DCUDA(int P,
 		dL_dt[i + 3] = dL_dtx * c_theta.x + dL_dty * c_theta.y + dL_dtz * c_theta.z;
 	}
 	for (int i = 0; i < 6; i++) {
-		dL_dtau[6 * idx + i] += dL_dt[i];
+		dL_dtau[6 * idx + i] += dL_dt_prime[i];
+		dL_dvel[6 * idx + i] += dL_dt[i];
 	}
 
 	// Account for transformation of mean to t
@@ -355,6 +367,10 @@ __global__ void computeCov2DCUDA(int P,
 	float dL_dW21 = J[0][2] * dL_dT01 + J[1][2] * dL_dT11;
 	float dL_dW22 = J[0][2] * dL_dT02 + J[1][2] * dL_dT12;
 
+	float3 c1_prime = R_prime.cols[0];
+	float3 c2_prime = R_prime.cols[1];
+	float3 c3_prime = R_prime.cols[2];
+
 	float3 c1 = R.cols[0];
 	float3 c2 = R.cols[1];
 	float3 c3 = R.cols[2];
@@ -375,9 +391,21 @@ __global__ void computeCov2DCUDA(int P,
 	float3 dL_dWc2 = dL_dW.cols[1];
 	float3 dL_dWc3 = dL_dW.cols[2];
 
-	mat33 n_W1_x = -R_vel_mat33 * mat33::skew_symmetric(c1);
-	mat33 n_W2_x = -R_vel_mat33 * mat33::skew_symmetric(c2);
-	mat33 n_W3_x = -R_vel_mat33 * mat33::skew_symmetric(c3);
+	mat33 n_W1_x_prime = -R_vel_mat33 * mat33::skew_symmetric(c1_prime);
+	mat33 n_W2_x_prime = -R_vel_mat33 * mat33::skew_symmetric(c2_prime);
+	mat33 n_W3_x_prime = -R_vel_mat33 * mat33::skew_symmetric(c3_prime);
+
+	mat33 n_W1_x = -mat33::skew_symmetric(c1);
+	mat33 n_W2_x = -mat33::skew_symmetric(c2);
+	mat33 n_W3_x = -mat33::skew_symmetric(c3);
+
+	float3 dL_dtheta_prime = {};
+	dL_dtheta_prime.x = dot(dL_dWc1, n_W1_x_prime.cols[0]) + dot(dL_dWc2, n_W2_x_prime.cols[0]) +
+				dot(dL_dWc3, n_W3_x_prime.cols[0]);
+	dL_dtheta_prime.y = dot(dL_dWc1, n_W1_x_prime.cols[1]) + dot(dL_dWc2, n_W2_x_prime.cols[1]) +
+				dot(dL_dWc3, n_W3_x_prime.cols[1]);
+	dL_dtheta_prime.z = dot(dL_dWc1, n_W1_x_prime.cols[2]) + dot(dL_dWc2, n_W2_x_prime.cols[2]) +
+				dot(dL_dWc3, n_W3_x_prime.cols[2]);
 
 	float3 dL_dtheta = {};
 	dL_dtheta.x = dot(dL_dWc1, n_W1_x.cols[0]) + dot(dL_dWc2, n_W2_x.cols[0]) +
@@ -387,10 +415,12 @@ __global__ void computeCov2DCUDA(int P,
 	dL_dtheta.z = dot(dL_dWc1, n_W1_x.cols[2]) + dot(dL_dWc2, n_W2_x.cols[2]) +
 				dot(dL_dWc3, n_W3_x.cols[2]);
 
-	dL_dtau[6 * idx + 3] += dL_dtheta.x;
-	dL_dtau[6 * idx + 4] += dL_dtheta.y;
-	dL_dtau[6 * idx + 5] += dL_dtheta.z;
-
+	dL_dtau[6 * idx + 3] += dL_dtheta_prime.x;
+	dL_dtau[6 * idx + 4] += dL_dtheta_prime.y;
+	dL_dtau[6 * idx + 5] += dL_dtheta_prime.z;
+	dL_dvel[6 * idx + 3] += dL_dtheta.x;
+	dL_dvel[6 * idx + 4] += dL_dtheta.y;
+	dL_dvel[6 * idx + 5] += dL_dtheta.z;
 
 }
 
@@ -564,6 +594,7 @@ __global__ void preprocessCUDA(
 	}
 	for (int i = 0; i < 6; i++) {
 		dL_dtau[6 * idx + i] += dL_dt[i];
+		dL_dvel[6 * idx + i] += dL_dt[i];
 	}
 
 	// Compute gradient update due to computing depths
@@ -580,13 +611,15 @@ __global__ void preprocessCUDA(
 		float3 c_theta = dp_C_d_theta.cols[i];
 		dL_dtau[6 * idx + i] += dL_dpCz * c_rho.z;
 		dL_dtau[6 * idx + i + 3] += dL_dpCz * c_theta.z;
+		dL_dvel[6 * idx + i] += dL_dpCz * c_rho.z;
+		dL_dvel[6 * idx + i + 3] += dL_dpCz * c_theta.z;
 	}
 
 
 
 	// Compute gradient updates due to computing colors from SHs
 	if (shs)
-		computeColorFromSH(idx, D, M, (glm::vec3*)means, *campos, shs, clamped, (glm::vec3*)dL_dcolor, (glm::vec3*)dL_dmeans, (glm::vec3*)dL_dsh, dL_dtau);
+		computeColorFromSH(idx, D, M, (glm::vec3*)means, *campos, shs, clamped, (glm::vec3*)dL_dcolor, (glm::vec3*)dL_dmeans, (glm::vec3*)dL_dsh, dL_dtau, dL_dvel);
 
 	// Compute gradient updates due to computing covariance from scale/rotation
 	if (scales)
