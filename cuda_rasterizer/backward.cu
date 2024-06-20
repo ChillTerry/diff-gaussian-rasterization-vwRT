@@ -326,8 +326,8 @@ __global__ void computeCov2DCUDA(int P,
 	mat33 dpC_dtheta_prime = -R_vel_mat33 * mat33::skew_symmetric(t_prime);
 
 	mat33 R = T_CW.R().data();
-	mat33 dpC_drho = delta_time * mat33::identity();
-	mat33 dpC_dtheta = -delta_time * mat33::skew_symmetric(t);
+	mat33 dpC_drho = mat33::identity();
+	mat33 dpC_dtheta = -mat33::skew_symmetric(t);
 
 	float dL_dt_prime[6];
 	for (int i = 0; i < 3; i++) {
@@ -345,7 +345,7 @@ __global__ void computeCov2DCUDA(int P,
 	}
 	for (int i = 0; i < 6; i++) {
 		dL_dtau[6 * idx + i] += dL_dt_prime[i];
-		dL_dvel[6 * idx + i] += dL_dt[i];
+		dL_dvel[6 * idx + i] += delta_time * dL_dt[i];
 	}
 
 	// Account for transformation of mean to t
@@ -395,9 +395,9 @@ __global__ void computeCov2DCUDA(int P,
 	mat33 n_W2_x_prime = -R_vel_mat33 * mat33::skew_symmetric(c2_prime);
 	mat33 n_W3_x_prime = -R_vel_mat33 * mat33::skew_symmetric(c3_prime);
 
-	mat33 n_W1_x = -delta_time * mat33::skew_symmetric(c1);
-	mat33 n_W2_x = -delta_time * mat33::skew_symmetric(c2);
-	mat33 n_W3_x = -delta_time * mat33::skew_symmetric(c3);
+	mat33 n_W1_x = -mat33::skew_symmetric(c1);
+	mat33 n_W2_x = -mat33::skew_symmetric(c2);
+	mat33 n_W3_x = -mat33::skew_symmetric(c3);
 
 	float3 dL_dtheta_prime = {};
 	dL_dtheta_prime.x = dot(dL_dWc1, n_W1_x_prime.cols[0]) + dot(dL_dWc2, n_W2_x_prime.cols[0]) +
@@ -418,9 +418,9 @@ __global__ void computeCov2DCUDA(int P,
 	dL_dtau[6 * idx + 3] += dL_dtheta_prime.x;
 	dL_dtau[6 * idx + 4] += dL_dtheta_prime.y;
 	dL_dtau[6 * idx + 5] += dL_dtheta_prime.z;
-	dL_dvel[6 * idx + 3] += dL_dtheta.x;
-	dL_dvel[6 * idx + 4] += dL_dtheta.y;
-	dL_dvel[6 * idx + 5] += dL_dtheta.z;
+	dL_dvel[6 * idx + 3] += delta_time * dL_dtheta.x;
+	dL_dvel[6 * idx + 4] += delta_time * dL_dtheta.y;
+	dL_dvel[6 * idx + 5] += delta_time * dL_dtheta.z;
 
 }
 
@@ -594,7 +594,7 @@ __global__ void preprocessCUDA(
 	}
 	for (int i = 0; i < 6; i++) {
 		dL_dtau[6 * idx + i] += dL_dt[i];
-		dL_dvel[6 * idx + i] += dL_dt[i];
+		dL_dvel[6 * idx + i] += delta_time * dL_dt[i];
 	}
 
 	// Compute gradient update due to computing depths

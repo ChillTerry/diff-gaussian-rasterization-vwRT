@@ -165,8 +165,8 @@ class _RasterizeGaussians(torch.autograd.Function):
         grad_theta = grad_tau[3:].view(1, -1)
 
         grad_vel = torch.sum(grad_vel.view(-1, 6), dim=0)
-        grad_w = grad_vel[:3].view(1, -1)
-        grad_v = grad_vel[3:].view(1, -1)
+        grad_v = grad_vel[:3].view(1, -1)
+        grad_w = grad_vel[3:].view(1, -1)
 
         grads = (
             grad_means3D,
