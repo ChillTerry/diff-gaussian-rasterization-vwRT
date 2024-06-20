@@ -557,10 +557,16 @@ __global__ void preprocessCUDA(
 	float d = proj_raw[14];
 	float e = proj_raw[11];
 
+	SE3 T_vel(vel_transofrm);
+	SE3 T_vel_inv(vel_transofrm_inv);
 	SE3 T_CW(viewmatrix);
-	mat33 R = T_CW.R().data();
-	mat33 RT = R.transpose();
-	float3 t = T_CW.t();
+	SE3 T_CW_prime = T_vel_inv * T_CW;
+
+	mat33 R_vel_mat33 = T_vel.R().data();
+	float3 p_C_prime = T_CW_prime * m;
+	mat33 dp_C_prime_d_rho = R_vel_mat33 * mat33::identity();
+	mat33 dp_C_prime_d_theta = -R_vel_mat33 * mat33::skew_symmetric(p_C_prime);
+
 	float3 p_C = T_CW * m;
 	mat33 dp_C_d_rho = mat33::identity();
 	mat33 dp_C_d_theta = -mat33::skew_symmetric(p_C);
@@ -568,10 +574,30 @@ __global__ void preprocessCUDA(
 	float3 d_proj_dp_C1 = make_float3(alpha * a, 0.f, beta * e);
 	float3 d_proj_dp_C2 = make_float3(0.f, alpha * b, gamma * e);
 
+	float3 d_proj_dp_C1_prime_d_rho = dp_C_prime_d_rho.transpose() * d_proj_dp_C1; // x.T A = A.T x
+	float3 d_proj_dp_C2_prime_d_rho = dp_C_prime_d_rho.transpose() * d_proj_dp_C2;
+	float3 d_proj_dp_C1_prime_d_theta = dp_C_prime_d_theta.transpose() * d_proj_dp_C1;
+	float3 d_proj_dp_C2_prime_d_theta = dp_C_prime_d_theta.transpose() * d_proj_dp_C2;
+
 	float3 d_proj_dp_C1_d_rho = dp_C_d_rho.transpose() * d_proj_dp_C1; // x.T A = A.T x
 	float3 d_proj_dp_C2_d_rho = dp_C_d_rho.transpose() * d_proj_dp_C2;
 	float3 d_proj_dp_C1_d_theta = dp_C_d_theta.transpose() * d_proj_dp_C1;
 	float3 d_proj_dp_C2_d_theta = dp_C_d_theta.transpose() * d_proj_dp_C2;
+
+	float2 dmean2D_dtau_prime[6];
+	dmean2D_dtau_prime[0].x = d_proj_dp_C1_prime_d_rho.x;
+	dmean2D_dtau_prime[1].x = d_proj_dp_C1_prime_d_rho.y;
+	dmean2D_dtau_prime[2].x = d_proj_dp_C1_prime_d_rho.z;
+	dmean2D_dtau_prime[3].x = d_proj_dp_C1_prime_d_theta.x;
+	dmean2D_dtau_prime[4].x = d_proj_dp_C1_prime_d_theta.y;
+	dmean2D_dtau_prime[5].x = d_proj_dp_C1_prime_d_theta.z;
+
+	dmean2D_dtau_prime[0].y = d_proj_dp_C2_prime_d_rho.x;
+	dmean2D_dtau_prime[1].y = d_proj_dp_C2_prime_d_rho.y;
+	dmean2D_dtau_prime[2].y = d_proj_dp_C2_prime_d_rho.z;
+	dmean2D_dtau_prime[3].y = d_proj_dp_C2_prime_d_theta.x;
+	dmean2D_dtau_prime[4].y = d_proj_dp_C2_prime_d_theta.y;
+	dmean2D_dtau_prime[5].y = d_proj_dp_C2_prime_d_theta.z;
 
 	float2 dmean2D_dtau[6];
 	dmean2D_dtau[0].x = d_proj_dp_C1_d_rho.x;
@@ -588,12 +614,14 @@ __global__ void preprocessCUDA(
 	dmean2D_dtau[4].y = d_proj_dp_C2_d_theta.y;
 	dmean2D_dtau[5].y = d_proj_dp_C2_d_theta.z;
 
+	float dL_dt_prime[6];
 	float dL_dt[6];
 	for (int i = 0; i < 6; i++) {
+		dL_dt_prime[i] = dL_dmean2D[idx].x * dmean2D_dtau_prime[i].x + dL_dmean2D[idx].y * dmean2D_dtau_prime[i].y;
 		dL_dt[i] = dL_dmean2D[idx].x * dmean2D_dtau[i].x + dL_dmean2D[idx].y * dmean2D_dtau[i].y;
 	}
 	for (int i = 0; i < 6; i++) {
-		dL_dtau[6 * idx + i] += dL_dt[i];
+		dL_dtau[6 * idx + i] += dL_dt_prime[i];
 		dL_dvel[6 * idx + i] += delta_time * dL_dt[i];
 	}
 
