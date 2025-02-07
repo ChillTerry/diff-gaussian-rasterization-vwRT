@@ -1,11 +1,12 @@
-# Differential Gaussian Rasterization with Camera Pose Jacobians
+<h1 align="center">Differential Gaussian Rasterization with Camera Velocity and Pose Jacobians</h1>
 
-This software is used as the rasterization engine in the paper ["Gaussian Splatting SLAM"](https://arxiv.org/abs/2312.06741), and supports:
+This software is used as the rasterization engine in the ICRA25 paper ["GS-EVT: Cross-Modal Event Camera Tracking based on Gaussian Splatting"](https://arxiv.org/pdf/2409.19228v1), and supports:
 
-* Analytical gradient for SE(3) camera poses.
+* Analytical gradient for camera velocity.
+* Analytical gradient for camera poses.
 * Analytical gradient for rendered depth.
 
-The code is built on top of the original [Differential Gaussian Rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) used in "3D Gaussian Splatting for Real-Time Rendering of Radiance Fields".
+The code is built on top of the original [diff-gaussian-rasterization-w-pose](https://github.com/rmurai0610/diff-gaussian-rasterization-w-pose) used in ["Gaussian Splatting SLAM"](https://arxiv.org/pdf/2312.06741).
 
 If you can make use of it in your own research, please be so kind to cite both papers.
 
@@ -13,15 +14,11 @@ If you can make use of it in your own research, please be so kind to cite both p
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
-    <pre><code>@Article{kerbl3Dgaussians,
-      author       = {Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
-      title        = {3D Gaussian Splatting for Real-Time Radiance Field Rendering},
-      journal      = {ACM Transactions on Graphics},
-      number       = {4},
-      volume       = {42},
-      month        = {July},
-      year         = {2023},
-      url          = {https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/}
+    <pre><code>@article{liu2024gs,
+  title={GS-EVT: Cross-Modal Event Camera Tracking based on Gaussian Splatting},
+  author={Liu, Tao and Yuan, Runze and Ju, Yi'ang and Xu, Xun and Yang, Jiaqi and Meng, Xiangting and Lagorce, Xavier and Kneip, Laurent},
+  journal={arXiv preprint arXiv:2409.19228},
+  year={2024}
 }</code></pre>
 </code></pre>
     <pre><code>@inproceedings{Matsuki:Murai:etal:CVPR2024,
